@@ -1,17 +1,21 @@
-# DriveOS Alpha 0.1
+# DriveOS Alpha 0.2
 
-Početna Android infotainment aplikacija za aftermarket Android head unit uređaje, uključujući Junsun.
+Eksperimentalna Android infotainment aplikacija za aftermarket Android head unit uređaje (uključujući Junsun) i Android emulatore.
 
-## Mogućnosti
-- Landscape dashboard za navigaciju i glazbene aplikacije
-- Prečaci za Google Maps, Waze, Spotify i YouTube Music
-- Dijagnostika Android uređaja i dijeljenje izvještaja
-- Siguran izlaz bez zamjene HOME launchera
+## Što je novo
+- Tamni landscape dashboard s navigacijskom i medijskom zonom
+- **Demo Mode** s primjerom navigacijskih uputa, simuliranom brzinom 65 km/h i demonstracijskim medijskim tipkama
+- Pregled instaliranih aplikacija: Maps, Waze, Spotify i YouTube Music
+- Otvaranje instaliranih aplikacija ili poveznica na Play Store kada nedostaju
+- Dijagnostika modela, Android verzije i rezolucije te dijeljenje izvještaja
+- Siguran izlaz; ne mijenja se HOME launcher
+
+**Važno:** Demo player nema zvuk i ne kontrolira stvarnu reprodukciju. Demo brzina nije GPS podatak. Live način trenutačno otvara vanjske aplikacije; ne ugrađuje Google Maps ili Waze u dashboard.
 
 ## APK
-Otvorite karticu **Actions**, odaberite **Build DriveOS APK**, a zatim zadnje uspješno pokretanje. Pod **Artifacts** preuzmite `DriveOS-Alpha-0.1-debug-APK`.
+U kartici **Actions** odaberite zadnji uspješni **Build DriveOS APK** pa pod **Artifacts** preuzmite ZIP s debug APK-om. Na mobilnom uređaju/emulatoru instalirajte `app-debug.apk`.
 
-Upozorenje: početna verzija je eksperimentalna i nije namijenjena upravljanju tijekom vožnje. Instalirati i testirati dok je vozilo parkirano.
+## Build
+GitHub Actions koristi JDK 17, Gradle 8.9 i Android SDK 35. Aplikacija podržava Android API 23+ (Android 6.0+).
 
-## Build lokalno
-Android Studio ili `gradle :app:assembleDebug` s JDK 17, Gradle 8.9 i Android SDK 35.
+Testirajte dok je vozilo parkirano. Još nije testirano na stvarnom Junsun MCU-u niti su implementirane kontrole volana, poziva i prava medijska integracija.
