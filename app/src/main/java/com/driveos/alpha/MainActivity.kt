@@ -14,6 +14,11 @@ import org.osmdroid.views.MapView
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.config.Configuration
+import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Overlay
+import kotlinx.coroutines.launch
+import android.location.Geocoder
 import android.content.ActivityNotFoundException
 import android.net.Uri
 import android.os.Build
@@ -83,7 +88,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun report(): String = """
-        DriveOS Alpha 0.4
+        DriveOS Alpha 0.5
         Manufacturer: ${Build.MANUFACTURER}
         Brand: ${Build.BRAND}
         Model: ${Build.MODEL}
@@ -126,6 +131,11 @@ class MainActivity : ComponentActivity() {
         } }
         var seconds by remember { mutableIntStateOf(0) }
         var gpsLabel by remember { mutableStateOf("GPS nije provjeren") }
+        var destination by remember { mutableStateOf("") }
+        var route by remember { mutableStateOf<DriveRoute?>(null) }
+        var routeStatus by remember { mutableStateOf("Demo polazište: Rijeka; za Live rutu potreban je GPS") }
+        var routeBusy by remember { mutableStateOf(false) }
+        val routeScope = rememberCoroutineScope()
         var gpsSpeed by remember { mutableStateOf<Double?>(null) }
         LaunchedEffect(demo) {
             while (!demo) {
@@ -151,7 +161,7 @@ class MainActivity : ComponentActivity() {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("DRIVE", color=white, fontSize=23.sp, fontWeight=FontWeight.Black)
                 Text("OS", color=accent, fontSize=23.sp, fontWeight=FontWeight.Black)
-                Text("   ALPHA 0.4", color=muted, fontSize=11.sp)
+                Text("   ALPHA 0.5", color=muted, fontSize=11.sp)
                 Spacer(Modifier.weight(1f))
                 Text(if(demo) "● DEMO MODE" else "● LIVE MODE", color=if(demo) accent else muted, fontSize=12.sp, modifier=Modifier.clickable { demo=!demo; playing=false })
                 Spacer(Modifier.width(20.dp))
@@ -192,7 +202,7 @@ class MainActivity : ComponentActivity() {
                                 Text(if(demo) "SIMULACIJA" else "SPREMNO", color=muted, fontSize=12.sp)
                             }
                             Box(Modifier.weight(1f).fillMaxWidth()) {
-                                DriveMap(Modifier.fillMaxSize(), demo)
+                                DriveMap(Modifier.fillMaxSize(), route)
                                 if (demo) {
                                     Surface(Modifier.align(Alignment.BottomStart).padding(12.dp),color=Color(0xE5152132),shape=RoundedCornerShape(12.dp)) {
                                         Column(Modifier.padding(12.dp)) {
@@ -203,6 +213,41 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
+                            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                                OutlinedTextField(
+                                    value=destination,onValueChange={ destination=it },
+                                    modifier=Modifier.weight(1f).height(58.dp),
+                                    singleLine=true,
+                                    label={Text("Odredište, npr. Opatija")},
+                                    textStyle=androidx.compose.ui.text.TextStyle(fontSize=14.sp,color=white)
+                                )
+                                FilledButton(if(routeBusy) "Tražim..." else "Ruta") {
+                                    if (!routeBusy) {
+                                        routeBusy=true
+                                        routeScope.launch {
+                                            try {
+                                                val origin = if(demo) GeoPoint(45.3271,14.4422) else {
+                                                    if (ContextCompat.checkSelfPermission(this@MainActivity,Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)
+                                                        throw IllegalStateException("Prvo odobri pristup lokaciji u Live načinu.")
+                                                    val lm=getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                                                    val loc=listOf(LocationManager.GPS_PROVIDER,LocationManager.NETWORK_PROVIDER)
+                                                        .mapNotNull { try { lm.getLastKnownLocation(it) } catch (_:Exception) { null } }
+                                                        .maxByOrNull { it.time }
+                                                        ?:throw IllegalStateException("GPS lokacija nije dostupna.")
+                                                    if ((System.currentTimeMillis()-loc.time) !in 0L..60000L)
+                                                        throw IllegalStateException("GPS lokacija je zastarjela. Pričekaj novije očitanje.")
+                                                    GeoPoint(loc.latitude,loc.longitude)
+                                                }
+                                                val found=findTestRoute(this@MainActivity,destination,origin)
+                                                route=found
+                                                routeStatus=String.format(Locale.getDefault(),"Testna ruta: %.1f km · %d min · OSRM demo",found.km,found.minutes)
+                                            } catch(e:Exception) {route=null; routeStatus=e.message ?: "Ruta nije dostupna"}
+                                            finally {routeBusy=false}
+                                        }
+                                    }
+                                }
+                            }
+                            Text(routeStatus,color=muted,fontSize=11.sp,maxLines=2)
                             Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                                 FilledButton(if(appInstalled(maps)) "Otvori Maps" else "Instaliraj Maps", Modifier.weight(1f)) { openApp(maps) }
                                 FilledButton(if(appInstalled(waze)) "Otvori Waze" else "Instaliraj Waze", Modifier.weight(1f)) { openApp(waze) }
@@ -293,10 +338,10 @@ private fun clockNow()=SimpleDateFormat("HH:mm",Locale.getDefault()).format(Date
     }
 }
 
-@Composable private fun DriveMap(modifier: Modifier, demo: Boolean) {
+@Composable private fun DriveMap(modifier: Modifier, route: DriveRoute?) {
     val context=androidx.compose.ui.platform.LocalContext.current
     val map=remember {
-        Configuration.getInstance().userAgentValue="DriveOS/0.3 (com.driveos.alpha)"
+        Configuration.getInstance().userAgentValue="DriveOS/0.5 (com.driveos.alpha)"
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
@@ -306,9 +351,25 @@ private fun clockNow()=SimpleDateFormat("HH:mm",Locale.getDefault()).format(Date
             setBuiltInZoomControls(false)
         }
     }
+    val routeOverlay=remember { mutableStateOf<Polyline?>(null) }
     DisposableEffect(map) {
         map.onResume()
         onDispose { map.onPause(); map.onDetach() }
     }
-    AndroidView(factory={map}, modifier=modifier, update={})
+    AndroidView(factory={map}, modifier=modifier, update={ view ->
+        routeOverlay.value?.let { view.overlays.remove(it) }
+        routeOverlay.value=null
+        route?.let { result ->
+            val line=Polyline(view).apply {
+                setPoints(result.points)
+                outlinePaint.color=android.graphics.Color.rgb(38,202,187)
+                outlinePaint.strokeWidth=10f
+            }
+            view.overlays.add(line)
+            routeOverlay.value=line
+            val bounds=org.osmdroid.util.BoundingBox.fromGeoPoints(result.points)
+            view.post { view.zoomToBoundingBox(bounds,true,80) }
+        }
+        view.invalidate()
+    })
 }
