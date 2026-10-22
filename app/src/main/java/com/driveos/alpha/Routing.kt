@@ -27,20 +27,38 @@ suspend fun findTestRoute(context: Context, destination: String, start: GeoPoint
     }
     val place = matches?.firstOrNull() ?: throw IllegalStateException("Odredište nije pronađeno. Provjeri Google usluge ili naziv mjesta.")
     val end = GeoPoint(place.latitude, place.longitude)
-    val url = URL("https://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson")
-    val connection = url.openConnection() as HttpURLConnection
-    connection.connectTimeout = 12000
-    connection.readTimeout = 12000
-    connection.setRequestProperty("User-Agent", "DriveOS-Prototype/0.5 (GitHub keysers023-git/DriveOS)")
-    try {
-        val responseCode = try { connection.responseCode }
-        catch (e: SSLHandshakeException) {
-            throw IllegalStateException("OSRM HTTPS TLS handshake failed. Check emulator date, Android version, VPN or proxy. Details: " + e.message, e)
+    val coordinates = "${start.longitude},${start.latitude};${end.longitude},${end.latitude}"
+    val suffix = "/route/v1/driving/$coordinates?overview=full&geometries=geojson"
+    val endpoints = listOf(
+        "https://routing.openstreetmap.de/routed-car",
+        "https://router.project-osrm.org"
+    )
+    var payload: String? = null
+    val errors = mutableListOf<String>()
+    for (base in endpoints) {
+        val connection = URL(base + suffix).openConnection() as HttpURLConnection
+        connection.connectTimeout = 12000
+        connection.readTimeout = 12000
+        connection.setRequestProperty("User-Agent", "DriveOS-Prototype/0.5.2 (keysers023-git/DriveOS)")
+        connection.setRequestProperty("Accept", "application/json")
+        try {
+            val responseCode = connection.responseCode
+            if (responseCode != 200) throw IOException("HTTP $responseCode")
+            payload = connection.inputStream.bufferedReader().use { it.readText() }
+            break
+        } catch (e: SSLHandshakeException) {
+            errors.add("${URL(base).host}: TLS - ${e.message}")
         } catch (e: IOException) {
-            throw IllegalStateException("OSRM network failure (" + e.javaClass.simpleName + "): " + e.message, e)
+            errors.add("${URL(base).host}: ${e.javaClass.simpleName} - ${e.message}")
+        } finally {
+            connection.disconnect()
         }
-        if (responseCode != 200) throw IllegalStateException("Routing servis nije dostupan (HTTP " + responseCode + ").")
-        val data = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+    }
+    val response = payload ?: throw IllegalStateException(
+        "Routing servisi nisu dostupni putem HTTPS-a. " + errors.joinToString(" | ")
+    )
+    run {
+        val data = JSONObject(response)
         val result = data.optJSONArray("routes")?.optJSONObject(0) ?: throw IllegalStateException("Nije pronađena cestovna ruta.")
         val coords = result.getJSONObject("geometry").getJSONArray("coordinates")
         val points = (0 until coords.length()).map { index ->
@@ -49,7 +67,5 @@ suspend fun findTestRoute(context: Context, destination: String, start: GeoPoint
         }
         if (points.size < 2) throw IllegalStateException("Ruta nema dovoljno koordinata.")
         DriveRoute(points, result.getDouble("distance") / 1000.0, (result.getDouble("duration") / 60.0).toInt(), destination.trim())
-    } finally {
-        connection.disconnect()
     }
 }
