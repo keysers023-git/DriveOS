@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <queries>
         <package android:name="com.google.android.apps.maps" />
         <package android:name="com.waze" />
@@ -7,6 +9,13 @@
         <package android:name="com.google.android.apps.youtube.music" />
     </queries>
     <application android:allowBackup="false" android:label="DriveOS" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="false">
+        <service
+            android:name=".DriveNotificationListener"
+            android:label="DriveOS media control"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter><action android:name="android.service.notification.NotificationListenerService" /></intent-filter>
+        </service>
         <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
