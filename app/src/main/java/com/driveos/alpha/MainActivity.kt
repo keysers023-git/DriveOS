@@ -358,7 +358,7 @@ private fun clockNow()=SimpleDateFormat("HH:mm",Locale.getDefault()).format(Date
     }
     AndroidView(factory={map}, modifier=modifier, update={ view ->
         routeOverlay[0]?.let { view.overlays.remove(it) }
-        routeOverlay.value=null
+        routeOverlay[0]=null
         route?.let { result ->
             val line=Polyline(view).apply {
                 setPoints(result.points)
@@ -366,7 +366,7 @@ private fun clockNow()=SimpleDateFormat("HH:mm",Locale.getDefault()).format(Date
                 outlinePaint.strokeWidth=10f
             }
             view.overlays.add(line)
-            routeOverlay.value=line
+            routeOverlay[0]=line
             val bounds=org.osmdroid.util.BoundingBox.fromGeoPoints(result.points)
             view.post { view.zoomToBoundingBox(bounds,true,80) }
         }
