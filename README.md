@@ -1,4 +1,4 @@
-# DriveOS Alpha 0.2
+# DriveOS Alpha 0.4
 
 Eksperimentalna Android infotainment aplikacija za aftermarket Android head unit uređaje (uključujući Junsun) i Android emulatore.
 
@@ -19,3 +19,10 @@ U kartici **Actions** odaberite zadnji uspješni **Build DriveOS APK** pa pod **
 GitHub Actions koristi JDK 17, Gradle 8.9 i Android SDK 35. Aplikacija podržava Android API 23+ (Android 6.0+).
 
 Testirajte dok je vozilo parkirano. Još nije testirano na stvarnom Junsun MCU-u niti su implementirane kontrole volana, poziva i prava medijska integracija.
+
+
+## Alpha 0.4
+- Na karti su isključene ugrađene velike osmdroid tipke za zumiranje; pinch/miš ostaju dostupni.
+- Live način može zatražiti pristup lokaciji i prikazati GPS brzinu kada postoji svježe očitanje (unutar 15 sekundi). Trenutačno koristi `getLastKnownLocation`, a ne kontinuirane GPS nadogradnje.
+- Ako nema novog valjanog GPS očitanja, brzina se prikazuje kao `--`. BlueStacks može nemati dostupne podatke.
+- Demo način prikazuje simuliranu brzinu i upute. Karta zasad ostaje standardna OSM tema; tamna kartografska podloga, stvarno rutiranje i kompletan media player još nisu implementirani.
