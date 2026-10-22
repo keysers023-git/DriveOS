@@ -247,7 +247,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                            Text(routeStatus,color=muted,fontSize=11.sp,maxLines=2)
+                            Text(routeStatus,color=muted,fontSize=11.sp,maxLines=4)
                             Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                                 FilledButton(if(appInstalled(maps)) "Otvori Maps" else "Instaliraj Maps", Modifier.weight(1f)) { openApp(maps) }
                                 FilledButton(if(appInstalled(waze)) "Otvori Waze" else "Instaliraj Waze", Modifier.weight(1f)) { openApp(waze) }
