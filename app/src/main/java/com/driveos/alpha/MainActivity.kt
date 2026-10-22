@@ -19,7 +19,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -136,7 +135,7 @@ class MainActivity : ComponentActivity() {
                         val loc = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).mapNotNull { provider ->
                             try { lm.getLastKnownLocation(provider) } catch (_: Exception) { null }
                         }.maxByOrNull { it.time }
-                        gpsSpeed = loc?.takeIf { it.hasSpeed() }?.speed?.toDouble()?.times(3.6)
+                        gpsSpeed = loc?.takeIf { it.hasSpeed() && (System.currentTimeMillis() - it.time) in 0..15000 }?.speed?.toDouble()?.times(3.6)
                         gpsLabel = if (loc == null) "Lokacija još nije dostupna" else "Zadnje GPS očitanje · može biti staro"
                     } else { gpsSpeed=null;gpsLabel="Nije odobren pristup lokaciji" }
                 } catch (_: Exception) { gpsSpeed=null;gpsLabel="GPS nije dostupan" }
