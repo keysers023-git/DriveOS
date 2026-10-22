@@ -39,7 +39,7 @@ suspend fun findTestRoute(context: Context, destination: String, start: GeoPoint
         val connection = URL(base + suffix).openConnection() as HttpURLConnection
         connection.connectTimeout = 12000
         connection.readTimeout = 12000
-        connection.setRequestProperty("User-Agent", "DriveOS-Prototype/0.5.2 (keysers023-git/DriveOS)")
+        connection.setRequestProperty("User-Agent", "DriveOS-Prototype/0.5.3 (keysers023-git/DriveOS)")
         connection.setRequestProperty("Accept", "application/json")
         try {
             val responseCode = connection.responseCode
@@ -47,7 +47,7 @@ suspend fun findTestRoute(context: Context, destination: String, start: GeoPoint
             payload = connection.inputStream.bufferedReader().use { it.readText() }
             break
         } catch (e: SSLHandshakeException) {
-            errors.add("${URL(base).host}: TLS - ${e.message}")
+            errors.add("${URL(base).host}: TLS - ${generateSequence(e as Throwable?) { it.cause }.take(5).joinToString(" → ") { it.javaClass.simpleName + ": " + (it.message ?: "?") }}")
         } catch (e: IOException) {
             errors.add("${URL(base).host}: ${e.javaClass.simpleName} - ${e.message}")
         } finally {
