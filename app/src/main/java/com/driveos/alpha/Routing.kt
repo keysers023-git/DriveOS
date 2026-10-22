@@ -2,7 +2,8 @@ package com.driveos.alpha
 
 import android.content.Context
 import android.location.Geocoder
-import android.os.Build
+import java.io.IOException
+import javax.net.ssl.SSLHandshakeException
 import org.json.JSONObject
 import org.osmdroid.util.GeoPoint
 import java.net.HttpURLConnection
@@ -18,7 +19,12 @@ suspend fun findTestRoute(context: Context, destination: String, start: GeoPoint
     require(destination.trim().length >= 3) { "Upiši naziv odredišta (najmanje 3 znaka)." }
     val geocoder = Geocoder(context, Locale.getDefault())
     @Suppress("DEPRECATION")
-    val matches = geocoder.getFromLocationName(destination.trim(), 1)
+    val matches = try {
+        @Suppress("DEPRECATION")
+        geocoder.getFromLocationName(destination.trim(), 1)
+    } catch (e: Exception) {
+        throw IllegalStateException("Geocoding error (" + e.javaClass.simpleName + "): " + e.message + ". Android Geocoder may be unavailable in BlueStacks.", e)
+    }
     val place = matches?.firstOrNull() ?: throw IllegalStateException("Odredište nije pronađeno. Provjeri Google usluge ili naziv mjesta.")
     val end = GeoPoint(place.latitude, place.longitude)
     val url = URL("https://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson")
@@ -27,7 +33,13 @@ suspend fun findTestRoute(context: Context, destination: String, start: GeoPoint
     connection.readTimeout = 12000
     connection.setRequestProperty("User-Agent", "DriveOS-Prototype/0.5 (GitHub keysers023-git/DriveOS)")
     try {
-        if (connection.responseCode != 200) throw IllegalStateException("Routing servis trenutačno nije dostupan (HTTP ${connection.responseCode}).")
+        val responseCode = try { connection.responseCode }
+        catch (e: SSLHandshakeException) {
+            throw IllegalStateException("OSRM HTTPS TLS handshake failed. Check emulator date, Android version, VPN or proxy. Details: " + e.message, e)
+        } catch (e: IOException) {
+            throw IllegalStateException("OSRM network failure (" + e.javaClass.simpleName + "): " + e.message, e)
+        }
+        if (responseCode != 200) throw IllegalStateException("Routing servis nije dostupan (HTTP " + responseCode + ").")
         val data = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
         val result = data.optJSONArray("routes")?.optJSONObject(0) ?: throw IllegalStateException("Nije pronađena cestovna ruta.")
         val coords = result.getJSONObject("geometry").getJSONArray("coordinates")
