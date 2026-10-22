@@ -4,6 +4,10 @@ import android.content.ComponentName
 import android.media.session.MediaSessionManager
 import android.media.session.MediaController
 import android.content.Context
+import android.Manifest
+import android.location.LocationManager
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.content.Intent
 import androidx.compose.ui.viewinterop.AndroidView
 import org.osmdroid.views.MapView
@@ -80,7 +84,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun report(): String = """
-        DriveOS Alpha 0.2
+        DriveOS Alpha 0.4
         Manufacturer: ${Build.MANUFACTURER}
         Brand: ${Build.BRAND}
         Model: ${Build.MODEL}
@@ -122,6 +126,23 @@ class MainActivity : ComponentActivity() {
             delay(2000) 
         } }
         var seconds by remember { mutableIntStateOf(0) }
+        var gpsLabel by remember { mutableStateOf("GPS nije provjeren") }
+        var gpsSpeed by remember { mutableStateOf<Double?>(null) }
+        LaunchedEffect(demo) {
+            while (!demo) {
+                try {
+                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                        val loc = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).mapNotNull { provider ->
+                            try { lm.getLastKnownLocation(provider) } catch (_: Exception) { null }
+                        }.maxByOrNull { it.time }
+                        gpsSpeed = loc?.takeIf { it.hasSpeed() }?.speed?.toDouble()?.times(3.6)
+                        gpsLabel = if (loc == null) "Lokacija još nije dostupna" else "Zadnje GPS očitanje · može biti staro"
+                    } else { gpsSpeed=null;gpsLabel="Nije odobren pristup lokaciji" }
+                } catch (_: Exception) { gpsSpeed=null;gpsLabel="GPS nije dostupan" }
+                delay(5000)
+            }
+        }
         val tracks = listOf("Night Drive" to "DriveOS Demo", "Coastal Highway" to "DriveOS Demo", "After Dark" to "DriveOS Demo")
         LaunchedEffect(Unit) { while(true) { clock=clockNow(); delay(15000) } }
         LaunchedEffect(demo, playing) { while(demo && playing) { delay(1000); seconds++ } }
@@ -131,7 +152,7 @@ class MainActivity : ComponentActivity() {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("DRIVE", color=white, fontSize=23.sp, fontWeight=FontWeight.Black)
                 Text("OS", color=accent, fontSize=23.sp, fontWeight=FontWeight.Black)
-                Text("   ALPHA 0.3", color=muted, fontSize=11.sp)
+                Text("   ALPHA 0.4", color=muted, fontSize=11.sp)
                 Spacer(Modifier.weight(1f))
                 Text(if(demo) "● DEMO MODE" else "● LIVE MODE", color=if(demo) accent else muted, fontSize=12.sp, modifier=Modifier.clickable { demo=!demo; playing=false })
                 Spacer(Modifier.width(20.dp))
@@ -232,10 +253,11 @@ class MainActivity : ComponentActivity() {
                             Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement=Arrangement.SpaceBetween) {
                                 Text("VOZILO", color=accent, fontSize=12.sp, fontWeight=FontWeight.Bold)
                                 Row(verticalAlignment=Alignment.Bottom) {
-                                    Text(if(demo) "65" else "--", color=white, fontSize=44.sp, fontWeight=FontWeight.Black)
+                                    Text(if(demo) "65" else gpsSpeed?.toInt()?.toString() ?: "--", color=white, fontSize=44.sp, fontWeight=FontWeight.Black)
                                     Text(" km/h", color=muted, fontSize=17.sp, modifier=Modifier.padding(bottom=9.dp))
                                 }
-                                Text(if(demo) "Simulirana brzina · nije GPS" else "Nema očitanja brzine", color=muted, fontSize=12.sp)
+                                Text(if(demo) "Simulirana brzina · nije GPS" else gpsLabel, color=muted, fontSize=12.sp)
+                                if(!demo) FilledButton("Dopusti GPS") { requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 410) }
                             }
                         }
                     }
@@ -282,6 +304,7 @@ private fun clockNow()=SimpleDateFormat("HH:mm",Locale.getDefault()).format(Date
             controller.setZoom(13.0)
             controller.setCenter(GeoPoint(45.3271,14.4422))
             minZoomLevel=3.0
+            setBuiltInZoomControls(false)
         }
     }
     DisposableEffect(map) {
