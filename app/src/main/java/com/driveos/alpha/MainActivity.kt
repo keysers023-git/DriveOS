@@ -161,7 +161,7 @@ class MainActivity : ComponentActivity() {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("DRIVE", color=white, fontSize=23.sp, fontWeight=FontWeight.Black)
                 Text("OS", color=accent, fontSize=23.sp, fontWeight=FontWeight.Black)
-                Text("   ALPHA 0.5", color=muted, fontSize=11.sp)
+                Text("   ALPHA 0.5.2", color=muted, fontSize=11.sp)
                 Spacer(Modifier.weight(1f))
                 Text(if(demo) "● DEMO MODE" else "● LIVE MODE", color=if(demo) accent else muted, fontSize=12.sp, modifier=Modifier.clickable { demo=!demo; playing=false })
                 Spacer(Modifier.width(20.dp))
@@ -247,7 +247,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                            Text(routeStatus,color=muted,fontSize=11.sp,maxLines=4)
+                            Surface(color=Color(0xFF24374A),shape=RoundedCornerShape(8.dp)) { Text(routeStatus,color=white,fontSize=12.sp,maxLines=4,modifier=Modifier.padding(7.dp)) }
                             Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                                 FilledButton(if(appInstalled(maps)) "Otvori Maps" else "Instaliraj Maps", Modifier.weight(1f)) { openApp(maps) }
                                 FilledButton(if(appInstalled(waze)) "Otvori Waze" else "Instaliraj Waze", Modifier.weight(1f)) { openApp(waze) }
