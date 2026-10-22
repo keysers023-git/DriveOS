@@ -351,13 +351,13 @@ private fun clockNow()=SimpleDateFormat("HH:mm",Locale.getDefault()).format(Date
             setBuiltInZoomControls(false)
         }
     }
-    val routeOverlay=remember { mutableStateOf<Polyline?>(null) }
+    val routeOverlay=remember { arrayOfNulls<Polyline>(1) }
     DisposableEffect(map) {
         map.onResume()
         onDispose { map.onPause(); map.onDetach() }
     }
     AndroidView(factory={map}, modifier=modifier, update={ view ->
-        routeOverlay.value?.let { view.overlays.remove(it) }
+        routeOverlay[0]?.let { view.overlays.remove(it) }
         routeOverlay.value=null
         route?.let { result ->
             val line=Polyline(view).apply {
