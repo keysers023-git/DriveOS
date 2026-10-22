@@ -1,6 +1,15 @@
 package com.driveos.alpha
 
+import android.content.ComponentName
+import android.media.session.MediaSessionManager
+import android.media.session.MediaController
+import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.viewinterop.AndroidView
+import org.osmdroid.views.MapView
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.config.Configuration
 import android.content.ActivityNotFoundException
 import android.net.Uri
 import android.os.Build
@@ -101,6 +110,17 @@ class MainActivity : ComponentActivity() {
         var playing by remember { mutableStateOf(false) }
         var song by remember { mutableIntStateOf(0) }
         var clock by remember { mutableStateOf(clockNow()) }
+        var activeMedia by remember { mutableStateOf<MediaController?>(null) }
+        var mediaTitle by remember { mutableStateOf("Nema aktivne medijske sesije") }
+        var mediaArtist by remember { mutableStateOf("Pokreni Spotify ili drugu glazbenu aplikaciju") }
+        LaunchedEffect(demo) { while (!demo) { 
+            try { val manager=getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+                activeMedia=manager.getActiveSessions(ComponentName(this@MainActivity, DriveNotificationListener::class.java)).firstOrNull()
+                mediaTitle=activeMedia?.metadata?.getString("android.media.metadata.TITLE") ?: "Nema aktivne reprodukcije"
+                mediaArtist=activeMedia?.metadata?.getString("android.media.metadata.ARTIST") ?: "Omogući pristup obavijestima za DriveOS"
+            } catch (_: SecurityException) { activeMedia=null;mediaTitle="Potrebna dozvola";mediaArtist="Otvori pristup obavijestima u postavkama" }
+            delay(2000) 
+        } }
         var seconds by remember { mutableIntStateOf(0) }
         val tracks = listOf("Night Drive" to "DriveOS Demo", "Coastal Highway" to "DriveOS Demo", "After Dark" to "DriveOS Demo")
         LaunchedEffect(Unit) { while(true) { clock=clockNow(); delay(15000) } }
@@ -111,7 +131,7 @@ class MainActivity : ComponentActivity() {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("DRIVE", color=white, fontSize=23.sp, fontWeight=FontWeight.Black)
                 Text("OS", color=accent, fontSize=23.sp, fontWeight=FontWeight.Black)
-                Text("   ALPHA 0.2", color=muted, fontSize=11.sp)
+                Text("   ALPHA 0.3", color=muted, fontSize=11.sp)
                 Spacer(Modifier.weight(1f))
                 Text(if(demo) "● DEMO MODE" else "● LIVE MODE", color=if(demo) accent else muted, fontSize=12.sp, modifier=Modifier.clickable { demo=!demo; playing=false })
                 Spacer(Modifier.width(20.dp))
@@ -151,17 +171,16 @@ class MainActivity : ComponentActivity() {
                                 Text("NAVIGACIJA", color=accent, fontWeight=FontWeight.Bold, fontSize=13.sp)
                                 Text(if(demo) "SIMULACIJA" else "SPREMNO", color=muted, fontSize=12.sp)
                             }
-                            if(demo) {
-                                Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                                    Text("↗", fontSize=65.sp, color=accent)
-                                    Text("Za 450 m skrenite desno", color=white, fontSize=28.sp, fontWeight=FontWeight.Bold)
-                                    Text("Obalna cesta  ·  Primjer rute", color=muted, fontSize=16.sp)
-                                    Text("12 min  •  7,4 km", color=accent, fontSize=18.sp)
-                                }
-                            } else {
-                                Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                                    Text("Odaberi navigaciju", color=white, fontSize=28.sp, fontWeight=FontWeight.Bold)
-                                    Text("Google Maps ili Waze otvaraju se kao zasebne aplikacije.", color=muted, fontSize=14.sp)
+                            Box(Modifier.weight(1f).fillMaxWidth()) {
+                                DriveMap(Modifier.fillMaxSize(), demo)
+                                if (demo) {
+                                    Surface(Modifier.align(Alignment.BottomStart).padding(12.dp),color=Color(0xE5152132),shape=RoundedCornerShape(12.dp)) {
+                                        Column(Modifier.padding(12.dp)) {
+                                            Text("DEMO RUTA · RIJEKA",color=accent,fontSize=12.sp,fontWeight=FontWeight.Bold)
+                                            Text("Za 450 m skrenite desno",color=white,fontSize=19.sp,fontWeight=FontWeight.Bold)
+                                            Text("Primjer upute · nije aktivna navigacija",color=muted,fontSize=11.sp)
+                                        }
+                                    }
                                 }
                             }
                             Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -186,7 +205,22 @@ class MainActivity : ComponentActivity() {
                                         FilledButton("▶▶") { song=(song+1)%tracks.size; seconds=0 }
                                     }
                                 } else {
-                                    Text("Medijske kontrole dolaze u idućoj verziji. Pokreni player.", color=muted, fontSize=14.sp)
+                                    Column {
+                                        Text(mediaTitle,color=white,fontSize=19.sp,fontWeight=FontWeight.Bold,maxLines=1)
+                                        Text(mediaArtist,color=muted,fontSize=12.sp,maxLines=1)
+                                    }
+                                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                                        FilledButton("◀◀") { activeMedia?.transportControls?.skipToPrevious() }
+                                        FilledButton("▶/Ⅱ") {
+                                            val s=activeMedia?.playbackState?.state
+                                            if(s==android.media.session.PlaybackState.STATE_PLAYING) activeMedia?.transportControls?.pause()
+                                            else activeMedia?.transportControls?.play()
+                                        }
+                                        FilledButton("▶▶") { activeMedia?.transportControls?.skipToNext() }
+                                    }
+                                    FilledButton("Media dozvole") {
+                                        startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
+                                    }
                                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                                         FilledButton("Spotify", Modifier.weight(1f)) { openApp(spotify) }
                                         FilledButton("YT Music", Modifier.weight(1f)) { openApp(ytMusic) }
@@ -236,4 +270,23 @@ private fun clockNow()=SimpleDateFormat("HH:mm",Locale.getDefault()).format(Date
             Text(text,color=if(selected) accent else white,fontSize=12.sp,maxLines=1)
         }
     }
+}
+
+@Composable private fun DriveMap(modifier: Modifier, demo: Boolean) {
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val map=remember {
+        Configuration.getInstance().userAgentValue="DriveOS/0.3 (com.driveos.alpha)"
+        MapView(context).apply {
+            setTileSource(TileSourceFactory.MAPNIK)
+            setMultiTouchControls(true)
+            controller.setZoom(13.0)
+            controller.setCenter(GeoPoint(45.3271,14.4422))
+            minZoomLevel=3.0
+        }
+    }
+    DisposableEffect(map) {
+        map.onResume()
+        onDispose { map.onPause(); map.onDetach() }
+    }
+    AndroidView(factory={map}, modifier=modifier, update={})
 }
